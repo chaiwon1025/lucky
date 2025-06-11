@@ -1,1 +1,207 @@
-<!-- Your result.html content goes here -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>위생점검 결과 분석</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
+    .container { max-width: 1000px; margin: 20px auto; padding: 30px; background-color: #fff; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    h1, h2 { text-align: center; color: #333; }
+    h1 { font-size: 2.2em; }
+    h2 { font-size: 1.5em; color: #555; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+    .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 20px; align-items: flex-start; }
+    .chart-box, .status-box { padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #fff; }
+    .full-width { grid-column: 1 / -1; }
+    .status-box h3 { text-align: center; margin-top: 0; font-size: 1.4em; }
+    .total-score-display { text-align: center; font-size: 4em; font-weight: bold; margin: 10px 0; }
+    .score-100 { font-size: 1.5rem; color: #888; }
+    .status-indicator { text-align: center; font-size: 2em; font-weight: bold; padding: 10px; border-radius: 5px; color: white; }
+    .status-excellent { background-color: #28a745; }
+    .status-good { background-color: #ffc107; color: #333; }
+    .status-needs-improvement { background-color: #dc3545; }
+    .section-scores h3 { text-align: center; margin-top: 0; font-size: 1.4em; }
+    .section-scores ul { list-style: none; padding: 0; }
+    .section-scores li { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; }
+    .section-scores li:last-child { border-bottom: none; }
+    .section-name { font-weight: bold; }
+    .section-rating { font-weight: bold; padding: 3px 8px; border-radius: 4px; color: white; }
+    .rating-high { background-color: #007bff; }
+    .rating-mid { background-color: #6c757d; }
+    .rating-low { background-color: #fd7e14; }
+    a.back-link { display: block; text-align: center; margin-top: 30px; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
+    a.back-link:hover { background-color: #0056b3; }
+    @media (max-width: 768px) { .grid-container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container" id="resultContainer">
+    <h1>위생점검 결과 분석 보고서</h1>
+    <h2 id="facilityInfo"></h2>
+
+    <div class="grid-container">
+      <div class="status-box full-width">
+        <h3>종합 평가</h3>
+        <div id="totalScoreValue" class="total-score-display"></div>
+        <div id="totalStatus" class="status-indicator"></div>
+      </div>
+
+      <div class="chart-box">
+        <canvas id="radarChart"></canvas>
+      </div>
+
+      <div class="chart-box">
+        <canvas id="barChart"></canvas>
+      </div>
+
+      <div class="section-scores full-width">
+        <h3>항목별 상세 점수</h3>
+        <ul id="scoreDetailsList"></ul>
+      </div>
+
+    </div>
+    <a href="index.html" class="back-link">점검표로 돌아가기</a>
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const resultDataString = localStorage.getItem('lastResult');
+    if (!resultDataString) {
+        document.getElementById('resultContainer').innerHTML = '<h1>표시할 결과가 없습니다.</h1><a href="index.html" class="back-link">점검표로 돌아가기</a>';
+        return;
+    }
+
+    const { name, date, responses, questions } = JSON.parse(resultDataString);
+    document.getElementById('facilityInfo').innerText = `${name} (${date})`;
+
+    const sectionResults = {};
+    let totalAchievedScore = 0;
+    let totalMaxScore = 0;
+
+    questions.forEach((group, gIdx) => {
+        let sectionAchievedScore = 0;
+        let sectionMaxScore = 0;
+        group.items.forEach((item, iIdx) => {
+            const responseScore = responses[group.section][iIdx];
+            const maxItemScore = item.scores[0];
+            
+            if (responseScore !== -1) { // -1은 미응답
+                sectionAchievedScore += responseScore;
+                sectionMaxScore += maxItemScore;
+            }
+        });
+        
+        totalAchievedScore += sectionAchievedScore;
+        totalMaxScore += sectionMaxScore;
+        
+        sectionResults[group.section] = {
+            achieved: sectionAchievedScore,
+            max: sectionMaxScore,
+            percentage: sectionMaxScore > 0 ? (sectionAchievedScore / sectionMaxScore) * 100 : 0
+        };
+    });
+
+    // 1. 종합 평가 시각화
+    const totalPercentage = totalMaxScore > 0 ? (totalAchievedScore / totalMaxScore) * 100 : 0;
+    const totalScoreDiv = document.getElementById('totalScoreValue');
+    const totalStatusDiv = document.getElementById('totalStatus');
+    
+    totalScoreDiv.innerHTML = `${totalAchievedScore.toLocaleString()}<span class="score-100"> / ${totalMaxScore.toLocaleString()}점</span>`;
+
+    if (totalPercentage >= 90) {
+        totalStatusDiv.textContent = '우수';
+        totalStatusDiv.className = 'status-indicator status-excellent';
+    } else if (totalPercentage >= 70) {
+        totalStatusDiv.textContent = '양호';
+        totalStatusDiv.className = 'status-indicator status-good';
+    } else {
+        totalStatusDiv.textContent = '미흡';
+        totalStatusDiv.className = 'status-indicator status-needs-improvement';
+    }
+
+    // 2. 항목별 상세 점수 목록
+    const scoreDetailsList = document.getElementById('scoreDetailsList');
+    Object.keys(sectionResults).forEach(section => {
+        const result = sectionResults[section];
+        const rating = getRating(result.percentage);
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span class="section-name">${section}</span>
+            <span>${result.achieved} / ${result.max} 점 (${result.percentage.toFixed(1)}%)</span>
+            <span class="section-rating ${rating.class}">${rating.text}</span>
+        `;
+        scoreDetailsList.appendChild(li);
+    });
+
+    function getRating(percentage) {
+        if (percentage >= 85) return { text: '상', class: 'rating-high' };
+        if (percentage >= 60) return { text: '중', class: 'rating-mid' };
+        return { text: '하', class: 'rating-low' };
+    }
+
+    const sectionLabels = Object.keys(sectionResults);
+    const sectionPercentages = sectionLabels.map(label => sectionResults[label].percentage);
+
+    // 3. 육각형 방사형 차트 (Radar Chart)
+    const radarCtx = document.getElementById('radarChart').getContext('2d');
+    new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: sectionLabels,
+            datasets: [{
+                label: '항목별 균형도 (%)',
+                data: sectionPercentages,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { title: { display: true, text: '항목별 강점·약점 분석', font: { size: 16 } } },
+            scales: {
+                r: {
+                    angleLines: { display: true },
+                    suggestedMin: 0,
+                    suggestedMax: 100,
+                    pointLabels: { font: { size: 12 } }
+                }
+            }
+        }
+    });
+
+    // 4. 항목별 점수 막대그래프 (Bar Chart)
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: sectionLabels,
+            datasets: [{
+                label: '항목별 달성률 (%)',
+                data: sectionPercentages,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 206, 86, 0.6)',
+                    'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y', // 가로 막대그래프로 변경
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { title: { display: true, text: '항목별 점수 현황', font: { size: 16 } }, legend: { display: false } },
+            scales: { x: { suggestedMin: 0, suggestedMax: 100 } }
+        }
+    });
+});
+</script>
+
+</body>
+</html>

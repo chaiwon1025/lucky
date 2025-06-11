@@ -2,201 +2,166 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>집단급식소 위생점검 체크리스트</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>집단급식소 위생점검 체크리스트 (v2.0)</title>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 20px;
+    body { font-family: sans-serif; margin: 20px; color: #333; }
+    h1 { text-align: center; }
+    .header-info { margin-bottom: 20px; padding: 15px; background-color:#f8f9fa; border-radius: 8px; }
+    fieldset { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
+    legend { font-weight: bold; font-size: 1.3em; color: #0056b3; padding: 0 10px; }
+    .question { margin-bottom: 15px; padding: 10px; border-left: 3px solid #e9ecef; }
+    .question:hover { background-color: #f8f9fa; }
+    .question-text { display: block; margin-bottom: 8px; font-size: 1.05em; }
+    label { margin-right: 15px; }
+    input[type="radio"] { margin-right: 5px; }
+    button {
+        display: inline-block; padding: 10px 20px; margin: 5px; font-size: 1em; font-weight: bold;
+        cursor: pointer; border: none; border-radius: 5px; color: white;
     }
-    fieldset {
-      margin-bottom: 20px;
-      padding: 15px;
-      border: 2px solid #ccc;
-      border-radius: 8px;
-    }
-    legend {
-      font-weight: bold;
-      font-size: 1.2em;
-    }
-    .question {
-      margin-bottom: 10px;
-    }
-    label {
-      margin-right: 10px;
-    }
-    #savedResults {
-      margin-top: 20px;
-    }
-    .result-item {
-      margin-bottom: 5px;
-    }
-    .watermark {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      opacity: 0.1;
-      width: 100px;
-    }
+    .btn-main { background-color: #007bff; }
+    .btn-save { background-color: #28a745; }
+    .btn-secondary { background-color: #6c757d; }
+    .btn-main:hover { background-color: #0056b3; }
+    .btn-save:hover { background-color: #218838; }
+    .btn-secondary:hover { background-color: #5a6268; }
+    #savedResults { margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; }
+    .result-item { margin-bottom: 5px; }
   </style>
 </head>
 <body>
   <h1>집단급식소 위생점검 체크리스트</h1>
 
-  <label>시설명: <input type="text" id="facilityName" /></label>
-  <label>방문일자: <input type="date" id="visitDate" /></label>
-  <button onclick="showSavedResults()">저장된 결과 보기</button>
+  <div class="header-info">
+      <label><b>시설명:</b> <input type="text" id="facilityName" /></label>
+      <label><b>방문일자:</b> <input type="date" id="visitDate" /></label>
+  </div>
 
   <form id="checklistForm"></form>
 
-  <button onclick="goToResultPage()">결과 보기</button>
-  <button onclick="saveResult()">응답 저장</button>
+  <button onclick="goToResultPage()" class="btn-main">결과 보기</button>
+  <button onclick="showSavedResults()" class="btn-secondary">저장된 결과 보기</button>
 
-  <div id="savedResults"></div>
-
-  <img src="logo.png" class="watermark" />
+  <div id="savedResults" style="display:none;"></div>
 
   <script>
+    // 배점 척도를 포함한 질문 목록
     const questions = [
       { section: "시설 등 환경", items: [
-        "전처리 구역과 조리구역 분리 또는 교차오염 방지 조치", 
-        "조리장 배수구 덮개 설치", 
-        "조리·세척·손씻기 시설 설치", 
-        "폐기물 용기 위생적 설치", 
-        "살균·소독기 설치", 
-        "채광과 환기시설 유지", 
-        "냉장･냉동시설 온도 유지 가능", 
-        "식품 접촉 재질 위생성", 
-        "쥐･해충 방지시설", 
-        "먹는물 공급 시설 적정성", 
-        "지하수 살균소독장치 설치 여부"
+        { text: "전처리 구역과 조리구역 분리 또는 교차오염 방지 조치", scores: [1, null, 0] },
+        { text: "조리장 배수구 덮개 설치", scores: [2, 1, 0] },
+        { text: "조리·세척·손씻기 시설 설치", scores: [2, 1, 0] },
+        { text: "폐기물 용기 위생적 설치", scores: [2, 1, 0] },
+        { text: "살균·소독기 설치", scores: [2, 1, 0] },
+        { text: "채광과 환기시설 유지", scores: [2, 1, 0] },
+        { text: "냉장･냉동시설 온도 유지 가능", scores: [2, null, 0] },
+        { text: "식품 접촉 재질 위생성", scores: [2, null, 0] },
+        { text: "쥐･해충 방지시설", scores: [2, 1, 0] },
+        { text: "먹는물 공급 시설 적정성", scores: [2, null, 0] },
+        { text: "지하수 살균소독장치 설치 여부", scores: [2, 1, 0] }
       ]},
       { section: "개인위생", items: [
-        "급식 인력 건강진단 및 결과서 보관", 
-        "조리원 위생모·마스크 등 착용 상태"
+        { text: "급식 인력 건강진단 및 결과서 보관", scores: [3, null, 0] },
+        { text: "조리원 위생모·마스크 등 착용 상태", scores: [3, 1, 0] }
       ]},
       { section: "원료사용", items: [
-        "검수일지 확인 및 보관", 
-        "무허가 원료 사용 여부", 
-        "부패·변질 원료 사용 여부", 
-        "무표시 원료 사용 여부", 
-        "원산지 표시", 
-        "축산물 검사 여부", 
-        "유통기한 경과 식품 사용 여부", 
-        "먹는물 수질 검사 여부", 
-        "위해평가 미완료 식품 사용 여부"
+        { text: "검수일지 확인 및 보관", scores: [2, null, 0] },
+        { text: "무허가 원료 사용 여부", scores: [3, null, 0] },
+        { text: "부패·변질 원료 사용 여부", scores: [4, null, 0] },
+        { text: "무표시 원료 사용 여부", scores: [3, null, 0] },
+        { text: "원산지 표시", scores: [2, null, 0] },
+        { text: "축산물 검사 여부", scores: [2, null, 0] },
+        { text: "유통기한 경과 식품 사용 여부", scores: [4, null, 0] },
+        { text: "먹는물 수질 검사 여부", scores: [2, null, 0] },
+        { text: "위해평가 미완료 식품 사용 여부", scores: [2, null, 0] }
       ]},
       { section: "공정관리", items: [
-        "조리공간 청결관리", 
-        "기구류 살균소독 후 사용", 
-        "동물 내장 조리기구 소독", 
-        "칼·도마 분리 사용", 
-        "행주·장갑 용도 구분", 
-        "전처리 식품 위생적 보관", 
-        "야채·과일 소독 및 헹굼", 
-        "해동 후 즉시 사용", 
-        "육류·어류 충분히 익힘", 
-        "조리식품 교차오염 방지", 
-        "조리 후 2시간 이내 배식"
+        { text: "조리공간 청결관리", scores: [2, 1, 0] },
+        { text: "기구류 살균소독 후 사용", scores: [2, 1, 0] },
+        { text: "동물 내장 조리기구 소독", scores: [2, 1, 0] },
+        { text: "칼·도마 분리 사용", scores: [3, 1, 0] },
+        { text: "행주·장갑 용도 구분", scores: [1, null, 0] },
+        { text: "전처리 식품 위생적 보관", scores: [2, null, 0] },
+        { text: "야채·과일 소독 및 헹굼", scores: [2, null, 0] },
+        { text: "해동 후 즉시 사용", scores: [2, null, 0] },
+        { text: "육류·어류 충분히 익힘", scores: [2, null, 0] },
+        { text: "조리식품 교차오염 방지", scores: [2, null, 0] },
+        { text: "조리 후 2시간 이내 배식", scores: [2, null, 0] }
       ]},
       { section: "보관관리", items: [
-        "부패식품 냉장·냉동 보관", 
-        "온도에 맞는 보관기준 준수", 
-        "온도계 설치", 
-        "식품/비식품 구분 보관"
+        { text: "부패식품 냉장·냉동 보관", scores: [3, null, 0] },
+        { text: "온도에 맞는 보관기준 준수", scores: [3, 1, 0] },
+        { text: "온도계 설치", scores: [2, 1, 0] },
+        { text: "식품/비식품 구분 보관", scores: [2, null, 0] }
       ]},
       { section: "기타사항", items: [
-        "직접 조리 여부 (어린이집)", 
-        "음식물 재사용 여부", 
-        "조리식품 -18℃ 이하 144시간 보관", 
-        "조리사 식품위생교육 이수", 
-        "소독 및 소독필증 보관", 
-        "위생관리 점검표 기록"
+        { text: "직접 조리 여부 (어린이집)", scores: [2, null, 0] },
+        { text: "음식물 재사용 여부", scores: [3, null, 0] },
+        { text: "조리식품 -18℃ 이하 144시간 보관", scores: [4, null, 0] },
+        { text: "조리사 식품위생교육 이수", scores: [2, null, 0] },
+        { text: "소독 및 소독필증 보관", scores: [2, null, 0] },
+        { text: "위생관리 점검표 기록", scores: [2, null, 0] }
       ]}
     ];
 
     const checklistForm = document.getElementById("checklistForm");
 
     questions.forEach((group, gIdx) => {
-      const fieldset = document.createElement("fieldset");
-      const legend = document.createElement("legend");
-      legend.innerText = `[${group.section}]`;
-      fieldset.appendChild(legend);
+        const fieldset = document.createElement("fieldset");
+        const legend = document.createElement("legend");
+        legend.innerText = group.section;
+        fieldset.appendChild(legend);
 
-      group.items.forEach((q, iIdx) => {
-        const div = document.createElement("div");
-        div.classList.add("question");
-        div.innerHTML = `
-          <label>${gIdx + 1}-${iIdx + 1}. ${q}</label><br>
-          <label><input type="radio" name="q${gIdx}_${iIdx}" value="2"> 적합</label>
-          <label><input type="radio" name="q${gIdx}_${iIdx}" value="1"> 보통</label>
-          <label><input type="radio" name="q${gIdx}_${iIdx}" value="0"> 부적합</label>
-        `;
-        fieldset.appendChild(div);
-      });
+        group.items.forEach((q, iIdx) => {
+            const div = document.createElement("div");
+            div.classList.add("question");
+            const qName = `q${gIdx}_${iIdx}`;
+            const [scoreGood, scoreSoSo, scoreBad] = q.scores;
 
-      checklistForm.appendChild(fieldset);
+            let radioButtons = `
+                <label><input type="radio" name="${qName}" value="${scoreGood}"> 적합</label>`;
+
+            if (scoreSoSo !== null) {
+                radioButtons += `<label><input type="radio" name="${qName}" value="${scoreSoSo}"> 보통</label>`;
+            } else {
+                 radioButtons += `<label style="color:#ccc;"><input type="radio" name="${qName}" value="" disabled> 보통</label>`;
+            }
+
+            radioButtons += `<label><input type="radio" name="${qName}" value="${scoreBad}"> 부적합</label>`;
+
+            div.innerHTML = `<span class="question-text">${iIdx + 1}. ${q.text}</span>${radioButtons}`;
+            fieldset.appendChild(div);
+        });
+        checklistForm.appendChild(fieldset);
     });
 
     function goToResultPage() {
-      const responses = {};
-      questions.forEach((group, gIdx) => {
-        responses[group.section] = [];
-        group.items.forEach((_, iIdx) => {
-          const value = document.querySelector(`input[name='q${gIdx}_${iIdx}']:checked`);
-          responses[group.section].push(value ? parseInt(value.value) : null);
+        const name = document.getElementById("facilityName").value;
+        const date = document.getElementById("visitDate").value;
+
+        if (!name || !date) {
+            alert("시설명과 방문일자를 입력해주세요.");
+            return;
+        }
+
+        const responses = {};
+        questions.forEach((group, gIdx) => {
+            responses[group.section] = [];
+            group.items.forEach((_, iIdx) => {
+                const value = document.querySelector(`input[name='q${gIdx}_${iIdx}']:checked`);
+                responses[group.section].push(value ? parseInt(value.value) : -1); // -1은 미응답
+            });
         });
-      });
 
-      const name = document.getElementById("facilityName").value;
-      const date = document.getElementById("visitDate").value;
-
-      if (!name || !date) {
-        alert("시설명과 방문일자를 입력해주세요.");
-        return;
-      }
-
-      localStorage.setItem("lastResult", JSON.stringify({ name, date, responses }));
-      window.location.href = "result.html";
+        const resultData = { name, date, responses, questions };
+        localStorage.setItem("lastResult", JSON.stringify(resultData));
+        window.location.href = "result.html";
     }
-
-    function saveResult() {
-      const name = document.getElementById("facilityName").value;
-      const date = document.getElementById("visitDate").value;
-      if (!name || !date) return alert("시설명과 방문일자를 입력해주세요.");
-
-      let total = 0;
-      questions.forEach((group, gIdx) => {
-        group.items.forEach((_, iIdx) => {
-          const value = document.querySelector(`input[name='q${gIdx}_${iIdx}']:checked`);
-          if (value) total += parseInt(value.value);
-        });
-      });
-
-      const key = `${name} ${date}`;
-      localStorage.setItem(key, total);
-      alert("저장되었습니다.");
-    }
-
+    
+    // 이 기능은 현재 페이지에서 불필요하여 숨김 처리합니다. 필요 시 `display:none`을 제거하세요.
     function showSavedResults() {
-      const resultDiv = document.getElementById("savedResults");
-      resultDiv.innerHTML = "<h3>저장된 결과 목록</h3>";
-      if (localStorage.length === 0) {
-        resultDiv.innerHTML += "<p>저장된 결과가 없습니다.</p>";
-        return;
-      }
-
-      const ul = document.createElement("ul");
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key === "lastResult") continue;
-        const value = localStorage.getItem(key);
-        const li = document.createElement("li");
-        li.className = "result-item";
-        li.innerText = `${key}: ${value}점`;
-        ul.appendChild(li);
-      }
-      resultDiv.appendChild(ul);
+        const div = document.getElementById("savedResults");
+        div.style.display = div.style.display === 'none' ? 'block' : 'none';
+        // 저장 기능은 현재 요구사항에서 제외되어 비워둡니다.
     }
   </script>
 </body>
